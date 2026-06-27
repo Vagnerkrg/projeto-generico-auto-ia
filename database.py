@@ -98,7 +98,7 @@ def verificar_disponibilidade_horario(data_horario: str) -> bool:
         return True  # Retorno seguro caso a tabela mude
 
 # ------------------------------------------------------------------
-# 🧠 FUNÇÕES PARA GESTÃO DE MEMÓRIA DA CONVERSA (PASSOS 2 E 3)
+# 🧠 FUNÇÕES PARA GESTÃO DE MEMÓREA DA CONVERSA (PASSOS 2 E 3)
 # ------------------------------------------------------------------
 
 def salvar_mensagem_historico(telefone: str, papel: str, texto: str):
@@ -201,6 +201,46 @@ def listar_todos_agendamentos() -> list:
                 "nome_pet": linha[3],
                 "servico": linha[4],
                 "data_horario": linha[5],
+                "status": linha[6]
+            })
+            
+        return agendamentos
+    except sqlite3.OperationalError:
+        conexao.close()
+        return []
+
+# ------------------------------------------------------------------
+# 📢 NOVA FUNÇÃO: BUSCA DE LEMBRETES ATIVOS POR DATA (CORRIGIDA)
+# ------------------------------------------------------------------
+
+def buscar_agendamentos_por_data(data_texto: str) -> list:
+    """
+    Busca no SQLite todos os agendamentos ativos/pendentes que correspondam
+    a uma data específica (formato 'AAAA-MM-DD').
+    Retorna uma lista de dicionários estruturados para o motor de lembretes.
+    """
+    conexao = sqlite3.connect("database/petshop.db")
+    cursor = conexao.cursor()
+    
+    try:
+        cursor.execute("""
+            SELECT id, telefone, nome_tutor, nome_pet, servico, data_horario, status 
+            FROM agendamentos 
+            WHERE data_horario LIKE ? AND status = 'Pendente'
+        """, (f"{data_texto}%",))
+        
+        linhas = cursor.fetchall()
+        conexao.close()
+        
+        agendamentos = []
+        for linha in linhas:
+            agendamentos.append({
+                "id": linha[0],
+                "telefone": linha[1],
+                "nome_tutor": linha[2],
+                "nome_pet": linha[3],
+                "servico": linha[4],
+                "data_horario": linha[5], # Correção do erro NameError 'line' -> 'linha'
                 "status": linha[6]
             })
             
