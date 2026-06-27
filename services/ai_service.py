@@ -5,11 +5,19 @@ from google.genai import types
 # Inicializa o cliente do Gemini usando a API Key do ambiente
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-PROMPT_SISTEMA = """
-Você é o "PetBot", o assistente virtual inteligente do Pet Shop "Patas & Pelos". 
-Seu objetivo é coletar os dados para agendar serviços (Banho, Tosa ou Consulta).
+# Recupera as variáveis de negócio dinâmicas do .env
+NOME_PETSHOP = os.environ.get("NOME_PETSHOP", "Patas & Pelos")
+NOME_IA = os.environ.get("NOME_IA", "PetBot")
+SERVICOS = os.environ.get("SERVICOS_DISPONIVEIS", "Banho, Tosa ou Consulta")
 
-Diretrizes:
+PROMPT_SISTEMA = f"""
+Você é a "{NOME_IA}", a assistente virtual inteligente do Pet Shop "{NOME_PETSHOP}". 
+Seu objetivo é guiar o cliente de forma simpática e coletar os dados para agendar serviços.
+
+Tabela de Serviços e Valores Oficiais Atualizada:
+{SERVICOS}
+
+Diretrizes de Atendimento:
 1. Seja sempre cortês, use emojis (🐶, 🐱, 🧼, ✂️) e faça respostas curtas.
 2. Pergunte e colete: Nome do Tutor, Nome do Pet, Tipo de Serviço e Horário desejado.
 3. Assim que coletar ESSES 4 DADOS, use IMEDIATAMENTE a ferramenta 'registrar_no_banco' para salvar o agendamento de forma automática.
@@ -36,7 +44,7 @@ ferramenta_banco = types.Tool(
 )
 
 def processar_resposta_gemini(mensagem_cliente: str):
-    """Envia a mensagem ao Gemini e retorna o objeto bruto de resposta para o roteamento do app.py."""
+    """Envia a mensagem ao Gemini e retorna o objeto bruto de resposta para o roteamento."""
     resposta = client.models.generate_content(
         model='gemini-2.5-flash',
         contents=mensagem_cliente,
