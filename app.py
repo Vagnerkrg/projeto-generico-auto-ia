@@ -1,22 +1,37 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 import uvicorn
+from pydantic import BaseModel
 from main import enviar_mensagem_ao_petbot
 
 app = FastAPI()
 
-# Rota obrigatória que a Evolution API vai disparar a cada mensagem recebida no WhatsApp
+# Define a estrutura exata para liberar os campos de digitação na tela do Swagger Docs
+class KeyModel(BaseModel):
+    remoteJid: str
+    fromMe: bool
+
+class MessageModel(BaseModel):
+    conversation: str
+
+class DataModel(BaseModel):
+    message: MessageModel
+    key: KeyModel
+
+class WebhookPayload(BaseModel):
+    data: DataModel
+
+# Rota do Webhook configurada com o modelo estruturado profissional
 @app.post("/webhook")
-async def receber_mensagem_whatsapp(request: Request):
-    dados = await request.json()
+async def receber_mensagem_whatsapp(payload: WebhookPayload):
     print("📩 [Webhook] Nova mensagem recebida do WhatsApp!")
     
     try:
-        # Extrai os dados básicos enviados pela Evolution API
-        mensagem_texto = dados.get("data", {}).get("message", {}).get("conversation", "")
-        numero_cliente = dados.get("data", {}).get("key", {}).get("remoteJid", "")
+        # Extrai os dados validados com base no modelo criado
+        mensagem_texto = payload.data.message.conversation
+        numero_cliente = payload.data.key.remoteJid
+        from_me = payload.data.key.fromMe
         
         # Ignora mensagens vazias ou mensagens enviadas pelo próprio bot
-        from_me = dados.get("data", {}).get("key", {}).get("fromMe", False)
         if from_me or not mensagem_texto:
             return {"status": "ignorado"}
             
@@ -26,9 +41,6 @@ async def receber_mensagem_whatsapp(request: Request):
         resposta_ia = enviar_mensagem_ao_petbot(mensagem_texto)
         print(f"🤖 Resposta do PetBot: {resposta_ia}")
         
-        # TODO: Aqui colocaremos a função HTTP Request para disparar a 'resposta_ia' 
-        # de volta para o WhatsApp do cliente usando a Evolution API.
-        
         return {"status": "sucesso", "resposta": resposta_ia}
         
     except Exception as e:
@@ -36,5 +48,4 @@ async def receber_mensagem_whatsapp(request: Request):
         return {"status": "erro", "detalhe": str(e)}
 
 if __name__ == "__main__":
-    # Roda o servidor local na porta 5000
     uvicorn.run(app, host="0.0.0.0", port=5000)
