@@ -9,7 +9,8 @@ load_dotenv()
 
 # Importações locais do projeto
 from services.ai_service import processar_resposta_gemini 
-from database import salvar_agendamento  
+# Importa a gravação e a nova função de histórico
+from database import salvar_agendamento, buscar_historico_tutor  
 
 app = FastAPI()
 
@@ -35,9 +36,15 @@ async def receber_mensagem(payload: WebhookPayload):
         
         print(f"📩 Mensagem extraída de {telefone_cliente}: {mensagem_cliente}")
         
+        # 1. Recupera o histórico do banco de dados para alimentar o contexto do bot
+        historico_contexto = buscar_historico_tutor(telefone_cliente)
+        
+        # 2. Concatena o histórico junto com a mensagem do cliente de forma inteligível para a IA
+        mensagem_com_contexto = f"{historico_contexto}\n\nMensagem Atual do Cliente: {mensagem_cliente}"
+        
         # Executa a IA capturando qualquer erro de SDK para não derrubar o Uvicorn
         try:
-            resultado_ia = processar_resposta_gemini(mensagem_cliente)
+            resultado_ia = processar_resposta_gemini(mensagem_com_contexto)
         except Exception as error_sdk:
             print(f"❌ Erro na SDK do Gemini: {str(error_sdk)}")
             raise HTTPException(status_code=500, detail=f"Erro na SDK da IA: {str(error_sdk)}")
@@ -45,13 +52,11 @@ async def receber_mensagem(payload: WebhookPayload):
         # ------------------------------------------------------------------
         # ROTEAMENTO INTELIGENTE E DEFENSIVO (Compatível com google-genai)
         # ------------------------------------------------------------------
-        # Captura as chamadas de função independente do formato retornado
         chamadas = getattr(resultado_ia, 'function_calls', None)
         
         if chamadas:
             print(f"📅 [ROTEAMENTO] Detectada Function Calling. Tipo do objeto: {type(chamadas)}")
             
-            # Se a SDK retornou uma lista de chamadas, pegamos a primeira
             if isinstance(chamadas, list) and len(chamadas) > 0:
                 chamada_principal = chamadas[0]
             else:
@@ -60,14 +65,14 @@ async def receber_mensagem(payload: WebhookPayload):
             nome_funcao = getattr(chamada_principal, 'name', None)
             argumentos = getattr(chamada_principal, 'args', {})
             
-            # Garante que argumentos seja um dicionário padrão Python
             if hasattr(argumentos, '__dict__'):
                 argumentos = dict(argumentos)
             
             print(f"📅 Executando ferramenta '{nome_funcao}' com dados: {argumentos}")
             
-            # Salva no SQLite nativo
+            # Salva no SQLite nativo contendo o identificador do telefone
             salvar_agendamento(
+                telefone=telefone_cliente,
                 nome_tutor=argumentos.get('nome_tutor', 'Não informado'),
                 nome_pet=argumentos.get('nome_pet', 'Não informado'),
                 servico=argumentos.get('servico', 'Não informado'),
