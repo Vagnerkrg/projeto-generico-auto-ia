@@ -68,3 +68,30 @@ def buscar_historico_tutor(telefone: str) -> str:
     except sqlite3.OperationalError:
         conexao.close()
         return "Histórico: Não foi possível ler os registros anteriores."
+
+def verificar_disponibilidade_horario(data_horario: str) -> bool:
+    """
+    Consulta o banco de dados para verificar se o horário solicitado já está ocupado.
+    Retorna True se estiver disponível, e False se estiver ocupado.
+    """
+    conexao = sqlite3.connect("database/petshop.db")
+    cursor = conexao.cursor()
+    
+    try:
+        # Busca se existe algum agendamento ativo no mesmo horário
+        cursor.execute("""
+            SELECT id FROM agendamentos 
+            WHERE data_horario = ? AND status != 'Cancelado'
+        """, (data_horario,))
+        
+        conflito = cursor.fetchone()
+        conexao.close()
+        
+        # Se encontrou algum registro, o horário NÃO está disponível (False)
+        if conflito:
+            return False
+            
+        return True
+    except sqlite3.OperationalError:
+        conexao.close()
+        return True  # Retorno seguro caso a tabela mude
