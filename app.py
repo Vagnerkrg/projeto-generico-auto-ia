@@ -9,8 +9,15 @@ load_dotenv()
 
 # Importações locais do projeto
 from services.ai_service import processar_resposta_gemini 
-# Injeta todas as funções nativas de validação e persistência do SQLite
-from database import salvar_agendamento, buscar_historico_tutor, verificar_disponibilidade_horario  
+# Importa todas as funções nativas de persistência e validações do SQLite
+from database import (
+    salvar_agendamento, 
+    buscar_historico_tutor, 
+    verificar_disponibilidade_horario,
+    salvar_mensagem_historico,
+    recuperar_contexto_conversa,
+    validar_horario_funcionamento  # <--- IMPORTAÇÃO DA NOVA TRAVA INTEGRADA
+)  
 from services.whatsapp_bot import enviar_mensagem_whatsapp  
 
 app = FastAPI()
@@ -24,7 +31,7 @@ class MessageData(BaseModel):
 
 class WebhookPayload(BaseModel):
     data: Optional[MessageData] = None
-    dados_testes: Optional[Dict[str, Any]] = None  # <--- Habilita testes livres sem gastar cota 429
+    dados_testes: Optional[Dict[str, Any]] = None  # Habilita testes livres sem gastar cota 429
 
 @app.post("/webhook")
 async def receber_mensagem(payload: WebhookPayload):
@@ -38,13 +45,21 @@ async def receber_mensagem(payload: WebhookPayload):
             telefone_cliente = "5521999999999"
             horario_solicitado = argumentos.get('data_horario', 'Não informado')
             
-            # Executa a exata mesma regra de negócio de conflito de horários
+            # ⏰ VALIDAÇÃO 1: HORÁRIO DE EXPEDIENTE COMERCIAL (NOVA TRAVA ATIVADA)
+            dentro_expediente = validar_horario_funcionamento(horario_solicitado)
+            if not dentro_expediente:
+                print(f"⚠️ [EXPEDIENTE] Horário '{horario_solicitado}' recusado por estar fora do expediente!")
+                resposta_erro = "Desculpe, o horário solicitado está fora do nosso expediente comercial. 🐾"
+                return {"status": "erro_expediente", "resposta_para_cliente": resposta_erro}
+            
+            # 📅 VALIDAÇÃO 2: HORÁRIO JÁ OCUPADO (TRAVA DE CONFLITOS)
             horario_livre = verificar_disponibilidade_horario(horario_solicitado)
             if not horario_livre:
                 print(f"⚠️ [CONFLITO] Horário '{horario_solicitado}' ocupado no banco local!")
                 resposta_conflito = f"Desculpe, o horário {horario_solicitado} já está preenchido por outro pet. 🐾"
                 return {"status": "conflito_horario", "resposta_para_cliente": resposta_conflito}
                 
+            # Se passou pelas duas travas, salva com total segurança
             salvar_agendamento(
                 telefone=telefone_cliente,
                 nome_tutor=argumentos.get('nome_tutor', 'Não informado'),
@@ -55,7 +70,7 @@ async def receber_mensagem(payload: WebhookPayload):
             return {"status": "agendado_com_sucesso", "dados_agendamento": argumentos}
 
         # ------------------------------------------------------------------
-        # 📲 FLUXO DO WHATSAPP REAL (PRODUÇÃO COM CAMADA INTERNA DO GEMINI)
+        # 📲 FLUXO DO WHATSAPP REAL (PRODUÇÃO COM MEMÓRIA SEQUENCIAL)
         # ------------------------------------------------------------------
         if not payload.data or not payload.data.message or not payload.data.message.conversation:
             raise HTTPException(status_code=400, detail="Formato de mensagem inválido.")
@@ -66,11 +81,14 @@ async def receber_mensagem(payload: WebhookPayload):
         
         print(f"📩 Mensagem extraída de {telefone_cliente}: {mensagem_cliente}")
         
-        historico_contexto = buscar_historico_tutor(telefone_cliente)
-        mensagem_com_contexto = f"{historico_contexto}\n\nMensagem Atual do Cliente: {mensagem_cliente}"
+        salvar_mensagem_historico(telefone=telefone_cliente, papel="user", texto=mensagem_cliente)
+        historico_cadastros = buscar_historico_tutor(telefone_cliente)
+        historico_chat_recente = recuperar_contexto_conversa(telefone_cliente)
+        
+        contexto_formatado = f"{historico_cadastros}\n\nHistórico Recente de Diálogo: {historico_chat_recente}\n\nMensagem Atual: {mensagem_cliente}"
         
         try:
-            resultado_ia = processar_resposta_gemini(mensagem_com_contexto)
+            resultado_ia = processar_resposta_gemini(contexto_formatado)
         except Exception as error_sdk:
             print(f"❌ Erro na SDK do Gemini: {str(error_sdk)}")
             raise HTTPException(status_code=500, detail=f"Erro na SDK da IA: {str(error_sdk)}")
@@ -78,7 +96,7 @@ async def receber_mensagem(payload: WebhookPayload):
         chamadas = getattr(resultado_ia, 'function_calls', None)
         
         if chamadas:
-            print(f"📅 [ROTEAMENTO] Detectada Function Calling. Tipo do objeto: {type(chamadas)}")
+            print(f"📅 [ROTEAMENTO] Detectada Function Calling.")
             
             if isinstance(chamadas, list) and len(chamadas) > 0:
                 chamada_principal = chamadas[0]
@@ -92,24 +110,27 @@ async def receber_mensagem(payload: WebhookPayload):
                 argumentos = dict(argumentos)
             
             horario_solicitado = argumentos.get('data_horario', 'Não informado')
-            print(f"📅 Executando ferramenta '{nome_funcao}' com dados: {argumentos}")
+            print(f"📅 Executando ferramenta '{nome_funcao}' para o horário: {horario_solicitado}")
             
-            # --- TRAVA DE AGENDAMENTOS DUPLICADOS (OPÇÃO 1) ---
+            # --- TRAVA 1: HORÁRIO DE EXPEDIENTE ---
+            dentro_expediente = validar_horario_funcionamento(horario_solicitado)
+            if not dentro_expediente:
+                resposta_erro = "Desculpe, o horário solicitado está fora do nosso expediente comercial. 🐾"
+                salvar_mensagem_historico(telefone=telefone_cliente, papel="model", texto=resposta_erro)
+                enviar_mensagem_whatsapp(telefone=telefone_cliente, texto=resposta_erro)
+                return {"status": "erro_expediente", "resposta_para_cliente": resposta_erro}
+            
+            # --- TRAVA 2: HORÁRIO JÁ OCUPADO ---
             horario_livre = verificar_disponibilidade_horario(horario_solicitado)
-            
             if not horario_livre:
-                print(f"⚠️ [CONFLITO] Horário '{horario_solicitado}' já está ocupado no sistema!")
+                print(f"⚠️ [CONFLITO] Horário '{horario_solicitado}' ocupado!")
                 resposta_conflito = (
-                    f"Desculpe, acabei de checar aqui no sistema do Pet Shop Amigo Fiel e o horário "
-                    f"**{horario_solicitado}** infelizmente já está preenchido por outro pet. 🐾\n\n"
-                    f"Poderia sugerir outro dia ou horário para o seu pet?"
+                    f"Desculpe, acabei de checar no sistema da {os.environ.get('NOME_PETSHOP', 'Amigo Fiel')} e o horário "
+                    f"**{horario_solicitado}** infelizmente já está ocupado. 🐾\nPoderia sugerir outro horário?"
                 )
+                salvar_mensagem_historico(telefone=telefone_cliente, papel="model", texto=resposta_conflito)
                 enviar_mensagem_whatsapp(telefone=telefone_cliente, texto=resposta_conflito)
-                return {
-                    "status": "conflito_horario",
-                    "resposta_para_cliente": resposta_conflito
-                }
-            # --------------------------------------------------
+                return {"status": "conflito_horario", "resposta_para_cliente": resposta_conflito}
             
             salvar_agendamento(
                 telefone=telefone_cliente,
@@ -124,21 +145,17 @@ async def receber_mensagem(payload: WebhookPayload):
                 f"para o pet **{argumentos.get('nome_pet')}** foi realizado com sucesso! 🐾"
             )
             
+            salvar_mensagem_historico(telefone=telefone_cliente, papel="model", texto=resposta_texto)
             enviar_mensagem_whatsapp(telefone=telefone_cliente, texto=resposta_texto)
-            return {
-                "status": "agendado_com_sucesso",
-                "dados_agendamento": argumentos,
-                "resposta_para_cliente": resposta_texto
-            }
+            return {"status": "agendado_com_sucesso", "dados_agendamento": argumentos, "resposta_para_cliente": resposta_texto}
             
         print("💬 [ROTEAMENTO] Seguindo fluxo de conversa comum.")
         resposta_texto = resultado_ia.text if hasattr(resultado_ia, 'text') else str(resultado_ia)
+        
+        salvar_mensagem_historico(telefone=telefone_cliente, papel="model", texto=resposta_texto)
         enviar_mensagem_whatsapp(telefone=telefone_cliente, texto=resposta_texto)
         
-        return {
-            "status": "conversa_comum",
-            "resposta_para_cliente": resposta_texto
-        }
+        return {"status": "conversa_comum", "resposta_para_cliente": resposta_texto}
 
     except Exception as e:
         print(f"❌ Erro crítico no endpoint webhook: {str(e)}")

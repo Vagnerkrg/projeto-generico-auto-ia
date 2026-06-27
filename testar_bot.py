@@ -4,13 +4,13 @@ import sys
 # URL oficial do endpoint local do FastAPI
 URL_WEBHOOK = "http://localhost:5000/webhook"
 
-# Payload estruturado para testar a lógica do banco (Mock/Bypass do Gemini)
+# Payload estruturado ajustado para 23h da noite (Força o bloqueio de expediente!)
 payload_teste = {
     "dados_testes": {
         "nome_tutor": "Carlos",
         "nome_pet": "Bob",
         "servico": "Banho",
-        "data_horario": "Amanhã às 14h"
+        "data_horario": "2026-06-29 23:00"  # <--- Horário fora do expediente (Pet shop fechado!)
     }
 }
 
