@@ -12,7 +12,6 @@ async def receber_mensagem_whatsapp(request: Request):
     
     try:
         # Extrai os dados básicos enviados pela Evolution API
-        # Nota: A estrutura exata do JSON pode variar dependendo da versão da Evolution API
         mensagem_texto = dados.get("data", {}).get("message", {}).get("conversation", "")
         numero_cliente = dados.get("data", {}).get("key", {}).get("remoteJid", "")
         
@@ -30,7 +29,7 @@ async def receber_mensagem_whatsapp(request: Request):
         # TODO: Aqui colocaremos a função HTTP Request para disparar a 'resposta_ia' 
         # de volta para o WhatsApp do cliente usando a Evolution API.
         
-        return {"status": "sucesso", "resposta": respuesta_ia}
+        return {"status": "sucesso", "resposta": resposta_ia}
         
     except Exception as e:
         print(f"❌ Erro ao processar webhook: {e}")

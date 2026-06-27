@@ -55,21 +55,23 @@ def enviar_mensagem_ao_petbot(mensagem_cliente):
         )
     )
     
-    # Verifica se a IA decidiu que é hora de salvar no banco de dados
+    # Captura a chamada de função se a IA decidir registrar no banco
     if resposta.function_calls:
         for chamada in resposta.function_calls:
             if chamada.name == "registrar_no_banco":
-                args = chamada.args
-                # Executa a gravação no arquivo SQL local
+                # Converte os argumentos da função para um dicionário Python estável
+                args = dict(chamada.args)
+                
+                # Executa a gravação no arquivo SQL local SQLite
                 salvar_agendamento(
-                    nome_tutor=args["nome_tutor"],
-                    nome_pet=args["nome_pet"],
-                    servico=args["servico"],
-                    data_horario=args["data_horario"]
+                    nome_tutor=str(args.get("nome_tutor")),
+                    nome_pet=str(args.get("nome_pet")),
+                    servico=str(args.get("servico")),
+                    data_horario=str(args.get("data_horario"))
                 )
                 return "✨ [Sistema] Seu agendamento foi registrado com sucesso em nosso banco de dados! Te esperamos aqui! 🐾"
 
-    return resposta.text
+    return respuesta.text if resposta.text else "Entendido! Como posso ajudar seu Pet hoje?"
 
 if __name__ == "__main__":
     print("\n" + "="*50)
