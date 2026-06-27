@@ -1,7 +1,6 @@
 import os
 from google import genai
 from google.genai import types
-from database import salvar_agendamento
 
 # Inicializa o cliente do Gemini usando a API Key do ambiente
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -36,8 +35,8 @@ ferramenta_banco = types.Tool(
     ]
 )
 
-def processar_resposta_gemini(mensagem_cliente: str) -> str:
-    """Envia a mensagem ao Gemini e gerencia a execução de Function Calling se necessário."""
+def processar_resposta_gemini(mensagem_cliente: str):
+    """Envia a mensagem ao Gemini e retorna o objeto bruto de resposta para o roteamento do app.py."""
     resposta = client.models.generate_content(
         model='gemini-2.5-flash',
         contents=mensagem_cliente,
@@ -48,17 +47,5 @@ def processar_resposta_gemini(mensagem_cliente: str) -> str:
         )
     )
     
-    # Executa a ação caso a IA decida chamar o banco de dados
-    if resposta.function_calls:
-        for chamada in resposta.function_calls:
-            if chamada.name == "registrar_no_banco":
-                args = dict(chamada.args)
-                salvar_agendamento(
-                    nome_tutor=str(args.get("nome_tutor")),
-                    nome_pet=str(args.get("nome_pet")),
-                    servico=str(args.get("servico")),
-                    data_horario=str(args.get("data_horario"))
-                )
-                return "✨ [Sistema] Seu agendamento foi registrado com sucesso em nosso banco de dados! Te esperamos aqui! 🐾"
-
-    return resposta.text if resposta.text else "Entendido! Como posso ajudar seu Pet hoje?"
+    # Retorna o objeto de resposta completo (permitindo que o app.py intercepte as function_calls)
+    return resposta
