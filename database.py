@@ -95,3 +95,37 @@ def verificar_disponibilidade_horario(data_horario: str) -> bool:
     except sqlite3.OperationalError:
         conexao.close()
         return True  # Retorno seguro caso a tabela mude
+
+# ------------------------------------------------------------------
+# 🧠 NOVAS FUNÇÕES PARA GESTÃO DE MEMÓRIA DA CONVERSA (PASSOS 2 E 3)
+# ------------------------------------------------------------------
+
+def salvar_mensagem_historico(telefone: str, papel: str, texto: str):
+    """Grava cada mensagem enviada (user) ou recebida (model) no banco de dados SQLite."""
+    conexao = sqlite3.connect("database/petshop.db")
+    cursor = conexao.cursor()
+    cursor.execute("""
+        INSERT INTO historico_conversas (telefone, papel, texto) 
+        VALUES (?, ?, ?)
+    """, (telefone, papel, texto))
+    conexao.commit()
+    conexao.close()
+    print(f"💾 [Memória] Mensagem do papel '{papel}' salva para o número {telefone}.")
+
+def recuperar_contexto_conversa(telefone: str) -> list:
+    """Recupera os últimos 6 diálogos do cliente para injetar como histórico nativo na SDK do Gemini."""
+    conexao = sqlite3.connect("database/petshop.db")
+    cursor = conexao.cursor()
+    cursor.execute("""
+        SELECT papel, texto FROM historico_conversas 
+        WHERE telefone = ? 
+        ORDER BY id DESC LIMIT 6
+    """, (telefone,))
+    linhas = cursor.fetchall()
+    conexao.close()
+    
+    # Inverte para manter a ordem cronológica correta da conversa (mais antiga para mais recente)
+    conversas = []
+    for papel, texto in reversed(linhas):
+        conversas.append({"role": papel, "parts": [texto]})
+    return conversas
