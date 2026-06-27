@@ -1,8 +1,8 @@
 import sqlite3
 
 def inicializar_banco():
-    # Cria ou conecta ao arquivo do banco de dados local
-    conexao = sqlite3.connect("petshop.db")
+    # Cria ou conecta ao arquivo do banco de dados dentro da pasta correta
+    conexao = sqlite3.connect("database/petshop.db")
     cursor = conexao.cursor()
     
     # Cria a tabela de agendamentos caso ela não exista
@@ -20,7 +20,8 @@ def inicializar_banco():
     conexao.close()
 
 def salvar_agendamento(nome_tutor, nome_pet, servico, data_horario):
-    conexao = sqlite3.connect("petshop.db")
+    # Conecta ao arquivo do banco de dados dentro da pasta correta
+    conexao = sqlite3.connect("database/petshop.db")
     cursor = conexao.cursor()
     
     cursor.execute("""

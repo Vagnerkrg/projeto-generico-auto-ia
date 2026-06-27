@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 import uvicorn
 from pydantic import BaseModel
-from main import enviar_mensagem_ao_petbot
+# Importa o novo serviço de IA isolado seguindo as boas práticas de arquitetura
+from services.ai_service import processar_resposta_gemini
 
 app = FastAPI()
 
@@ -37,8 +38,8 @@ async def receber_mensagem_whatsapp(payload: WebhookPayload):
             
         print(f"📱 De: {numero_cliente} | Mensagem: {mensagem_texto}")
         
-        # Envia a mensagem do cliente para a inteligência do nosso PetBot
-        resposta_ia = enviar_mensagem_ao_petbot(mensagem_texto)
+        # Envia a mensagem do cliente para o novo serviço de IA isolado
+        resposta_ia = processar_resposta_gemini(mensagem_texto)
         print(f"🤖 Resposta do PetBot: {resposta_ia}")
         
         return {"status": "sucesso", "resposta": resposta_ia}
