@@ -10,6 +10,7 @@ load_dotenv()
 # Importações locais do projeto
 from services.ai_service import processar_resposta_gemini 
 from database import salvar_agendamento, buscar_historico_tutor  
+from services.whatsapp_bot import enviar_mensagem_whatsapp  # Importação consolidada
 
 app = FastAPI()
 
@@ -83,6 +84,9 @@ async def receber_mensagem(payload: WebhookPayload):
                 f"para o pet **{argumentos.get('nome_pet')}** foi realizado com sucesso! 🐾"
             )
             
+            # 🚀 DISPARO COMPORTAMENTAL: Envia a resposta de volta ao cliente via WhatsApp
+            enviar_mensagem_whatsapp(telefone=telefone_cliente, texto=resposta_texto)
+            
             return {
                 "status": "agendado_com_sucesso",
                 "dados_agendamento": argumentos,
@@ -91,7 +95,10 @@ async def receber_mensagem(payload: WebhookPayload):
             
         # Fluxo de conversa comum
         print("💬 [ROTEAMENTO] Seguindo fluxo de conversa comum.")
-        resposta_texto = getattr(resultado_ia, 'text', str(resultado_ia))
+        resposta_texto = resultado_ia.text if hasattr(resultado_ia, 'text') else str(resultado_ia)
+        
+        # 🚀 DISPARO COMPORTAMENTAL: Envia a resposta de conversa comum de volta ao cliente
+        enviar_mensagem_whatsapp(telefone=telefone_cliente, texto=resposta_texto)
         
         return {
             "status": "conversa_comum",
