@@ -36,3 +36,4 @@ except requests.exceptions.Timeout:
     print("❌ Erro: Tempo limite estourado. Verifique se o ligar_tunnel.py continua ativo.")
 except Exception as e:
     print(f"❌ Falha crítica ao conectar: {str(e)}")
+
