@@ -170,3 +170,41 @@ def validar_horario_funcionamento(data_horario_texto: str) -> bool:
     except Exception:
         # Retorno defensivo: se houver falha na conversão da string, permite para não quebrar a IA
         return True
+
+# ------------------------------------------------------------------
+# 📊 NOVA FUNÇÃO: LISTAGEM DE AGENDAMENTOS PARA O DASHBOARD
+# ------------------------------------------------------------------
+
+def listar_todos_agendamentos() -> list:
+    """
+    Busca todos os agendamentos registrados no SQLite.
+    Retorna uma lista de dicionários organizada cronologicamente.
+    """
+    conexao = sqlite3.connect("database/petshop.db")
+    cursor = conexao.cursor()
+    
+    try:
+        cursor.execute("""
+            SELECT id, telefone, nome_tutor, nome_pet, servico, data_horario, status 
+            FROM agendamentos 
+            ORDER BY data_horario ASC
+        """)
+        linhas = cursor.fetchall()
+        conexao.close()
+        
+        agendamentos = []
+        for linha in linhas:
+            agendamentos.append({
+                "id": linha[0],
+                "telefone": linha[1],
+                "nome_tutor": linha[2],
+                "nome_pet": linha[3],
+                "servico": linha[4],
+                "data_horario": linha[5],
+                "status": linha[6]
+            })
+            
+        return agendamentos
+    except sqlite3.OperationalError:
+        conexao.close()
+        return []
