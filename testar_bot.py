@@ -1,9 +1,11 @@
 import requests
+import sys
 
-url = "http://localhost:5000/webhook"
+# URL oficial do endpoint local do FastAPI
+URL_WEBHOOK = "http://localhost:5000/webhook"
 
-# Dados simulados idênticos ao do WhatsApp (Dribla o limite 429 da API do Gemini)
-payload = {
+# Payload estruturado para testar a lógica do banco (Mock/Bypass do Gemini)
+payload_teste = {
     "dados_testes": {
         "nome_tutor": "Carlos",
         "nome_pet": "Bob",
@@ -12,8 +14,26 @@ payload = {
     }
 }
 
-print("🚀 Enviando dados de teste isolados para o servidor FastAPI...")
-resposta = requests.post(url, json=payload)
+def executar_teste_local():
+    print("🚀 Disparando carga de teste estruturada para o FastAPI...")
+    
+    try:
+        # Envia a requisição POST tratando falhas de conexão de rede
+        resposta = requests.post(URL_WEBHOOK, json=payload_teste, timeout=10)
+        
+        print(f"🔹 Status HTTP do Servidor: {resposta.status_code}")
+        
+        # Se o servidor responder com erro (Ex: 400 ou 500), exibe o log de erro
+        if resposta.status_code != 200:
+            print(f"❌ Falha no processamento do servidor: {resposta.text}")
+            return
+            
+        print(f"📦 Payload de Resposta Recebido: {resposta.json()}")
+        
+    except requests.exceptions.ConnectionError:
+        print("❌ Erro de Conexão: Certifique-se de que o Uvicorn está rodando na porta 5000!")
+    except Exception as erro_inesperado:
+        print(f"❌ Ocorreu um erro inesperado durante o teste: {str(erro_inesperado)}")
 
-print(f"🔹 Status do Servidor: {resposta.status_code}")
-print(f"📦 Resposta recebida: {resposta.json()}")
+if __name__ == "__main__":
+    executar_teste_local()
