@@ -1,52 +1,74 @@
-from fastapi import FastAPI
-import uvicorn
+import os
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-# Importa o novo serviço de IA isolado seguindo as boas práticas de arquitetura
-from services.ai_service import processar_resposta_gemini
+from typing import Dict, Any, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from services.ai_service import processar_resposta_gemini 
 
 app = FastAPI()
 
-# Define a estrutura exata para liberar os campos de digitação na tela do Swagger Docs
-class KeyModel(BaseModel):
-    remoteJid: str
-    fromMe: bool
+# Nova estrutura Pydantic para capturar o payload real do WhatsApp
+class MessageContent(BaseModel):
+    conversation: Optional[str] = None
 
-class MessageModel(BaseModel):
-    conversation: str
-
-class DataModel(BaseModel):
-    message: MessageModel
-    key: KeyModel
+class MessageData(BaseModel):
+    message: Optional[MessageContent] = None
+    key: Optional[Dict[str, Any]] = None
 
 class WebhookPayload(BaseModel):
-    data: DataModel
+    data: Optional[MessageData] = None
 
-# Rota do Webhook configurada com o modelo estruturado profissional
 @app.post("/webhook")
-async def receber_mensagem_whatsapp(payload: WebhookPayload):
-    print("📩 [Webhook] Nova mensagem recebida do WhatsApp!")
-    
+async def receber_mensagem(payload: WebhookPayload):
     try:
-        # Extrai os dados validados com base no modelo criado
-        mensagem_texto = payload.data.message.conversation
-        numero_cliente = payload.data.key.remoteJid
-        from_me = payload.data.key.fromMe
-        
-        # Ignora mensagens vazias ou mensagens enviadas pelo próprio bot
-        if from_me or not mensagem_texto:
-            return {"status": "ignorado"}
+        # Extrai os dados de forma segura tratando dados ausentes
+        if not payload.data or not payload.data.message or not payload.data.message.conversation:
+            raise HTTPException(status_code=400, detail="Formato de mensagem inválido ou texto vazio.")
             
-        print(f"📱 De: {numero_cliente} | Mensagem: {mensagem_texto}")
+        mensagem_cliente = payload.data.message.conversation
         
-        # Envia a mensagem do cliente para o novo serviço de IA isolado
-        resposta_ia = processar_resposta_gemini(mensagem_texto)
-        print(f"🤖 Resposta do PetBot: {resposta_ia}")
+        # Extrai o telefone de forma segura removendo o sufixo do WhatsApp
+        remote_jid = payload.data.key.get("remoteJid", "000000000") if payload.data.key else "000000000"
+        telefone_cliente = remote_jid.split("@")[0]
+        nome_usuario = "Cliente"  # Opcional: extrair de profiles mais tarde se disponível
         
-        return {"status": "sucesso", "resposta": resposta_ia}
+        print(f"📩 Mensagem extraída de {telefone_cliente}: {mensagem_cliente}")
         
-    except Exception as e:
-        print(f"❌ Erro ao processar webhook: {e}")
-        return {"status": "erro", "detalhe": str(e)}
+        # 1. Envia a mensagem extraída para o Gemini 2.5 Flash
+        resultado_ia = processar_resposta_gemini(mensagem_cliente)
+        
+        # 2. ROTEAMENTO: Analisa o que a IA decidiu fazer
+        if hasattr(resultado_ia, 'function_calls') and resultado_ia.function_calls:
+            chamada_funcao = resultado_ia.function_calls
+            nome_funcao = chamada_funcao.name
+            argumentos = llamada_funcao.args
+            
+            print(f"📅 [CAMINHO AGENDAMENTO] IA ativou a função: {nome_funcao} com os dados: {argumentos}")
+            
+            resposta_texto = (
+                f"🎉 Ótima notícia! O agendamento de **{argumentos.get('servico')}** "
+                f"para o pet **{argumentos.get('nome_pet')}** foi realizado com sucesso para o dia/horário {argumentos.get('data_horario')}! 🐾"
+            )
+            
+            return {
+                "status": "agendado_com_sucesso",
+                "dados_agendamento": argumentos,
+                "resposta_para_cliente": resposta_texto
+            }
+        
+        # 3. [CAMINHO CONVERSA COMUM]
+        else:
+            print("💬 [CAMINHO CONVERSA] IA apenas respondeu o cliente.")
+            resposta_texto = resultado_ia.text if hasattr(resultado_ia, 'text') else str(resultado_ia)
+            
+            return {
+                "status": "conversa_comum",
+                "resposta_para_cliente": resposta_texto
+            }
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    except Exception as e:
+        print(f"❌ Erro ao processar fluxo: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro interno no processamento do bot")
