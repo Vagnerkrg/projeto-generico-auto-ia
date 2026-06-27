@@ -46,6 +46,4 @@ def processar_resposta_gemini(mensagem_cliente: str):
             tools=[ferramenta_banco]
         )
     )
-    
-    # Retorna o objeto de resposta completo (permitindo que o app.py intercepte as function_calls)
     return resposta

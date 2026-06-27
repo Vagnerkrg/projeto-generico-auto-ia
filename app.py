@@ -9,7 +9,6 @@ load_dotenv()
 
 # Importações locais do projeto
 from services.ai_service import processar_resposta_gemini 
-# Importa a gravação e a nova função de histórico
 from database import salvar_agendamento, buscar_historico_tutor  
 
 app = FastAPI()
@@ -39,7 +38,7 @@ async def receber_mensagem(payload: WebhookPayload):
         # 1. Recupera o histórico do banco de dados para alimentar o contexto do bot
         historico_contexto = buscar_historico_tutor(telefone_cliente)
         
-        # 2. Concatena o histórico junto com a mensagem do cliente de forma inteligível para a IA
+        # 2. Concatena o histórico junto com a mensagem do cliente para a IA
         mensagem_com_contexto = f"{historico_contexto}\n\nMensagem Atual do Cliente: {mensagem_cliente}"
         
         # Executa a IA capturando qualquer erro de SDK para não derrubar o Uvicorn

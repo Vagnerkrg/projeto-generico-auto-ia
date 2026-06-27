@@ -19,6 +19,7 @@ def inicializar_banco():
     """)
     conexao.commit()
     conexao.close()
+    print("📋 [Banco de Dados] Tabela inicializada com sucesso!")
 
 def salvar_agendamento(telefone, nome_tutor, nome_pet, servico, data_horario):
     # Conecta ao arquivo do banco de dados dentro da pasta correta
