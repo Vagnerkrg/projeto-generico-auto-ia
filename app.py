@@ -198,3 +198,11 @@ async def mock_criar_instancia(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/mock-api/instance/connect/{instance_name}", tags=["Simulador Evolution"])
+async def mock_conectar_instancia(instance_name: str):
+    """Simula a rota de captura de dados de conexão, devolvendo o código de pareamento estável."""
+    print(f"🔍 [Simulador] Gerando código de pareamento para a instância: {instance_name}")
+    return {
+        "status": "SUCCESS",
+        "pairingCode": "LUNA-PET-2026",
+        "message": "Código de pareamento gerado localmente pelo simulador com sucesso."
+    }
