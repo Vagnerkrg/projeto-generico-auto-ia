@@ -1,5 +1,7 @@
 import os
+import datetime
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 
@@ -18,6 +20,8 @@ from database import (
 from services.ai_service import processar_conversa_gemini
 # Importação do envio de mensagens de volta ao cliente
 from services.whatsapp_bot import enviar_mensagem_whatsapp
+# Importação do fluxo de autenticação do Google Calendar
+from services.calendar_service import obter_fluxo_autenticacao, criar_evento_petshop
 
 app = FastAPI(
     title="Agente de IA para Pet Shop",
@@ -30,6 +34,34 @@ class MensagemWhatsApp(BaseModel):
     telefone: str
     texto: str
     is_mock: Optional[bool] = False
+
+# ------------------------------------------------------------------
+# 🔑 ROTAS DE AUTENTICAÇÃO DO GOOGLE CALENDAR
+# ------------------------------------------------------------------
+@app.get("/login-google", tags=["Google Calendar"])
+def login_google():
+    """Rota para iniciar a autenticação da Luna com a agenda."""
+    flow = obter_fluxo_autenticacao()
+    authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true')
+    return RedirectResponse(authorization_url)
+
+@app.get("/oauth2callback", tags=["Google Calendar"])
+async def oauth2callback(request: Request):
+    """Rota de retorno do Google que gera e grava o token.json."""
+    flow = obter_fluxo_autenticacao()
+    str_url = str(request.url)
+    
+    # Correção necessária caso o ngrok/redirecionador force protocolo HTTP interno
+    if "http://" in str_url and not "localhost" in str_url:
+        str_url = str_url.replace("http://", "https://")
+        
+    flow.fetch_token(authorization_response=str_url)
+    creds = flow.credentials
+    
+    with open('services/token.json', 'w') as token:
+        token.write(creds.to_json())
+        
+    return {"status": "Sucesso", "mensagem": "Luna está conectada com sucesso ao seu Google Calendar!"}
 
 # ------------------------------------------------------------------
 # 📊 ROTA DASHBOARD: LISTAR TODOS OS AGENDAMENTOS
@@ -57,7 +89,6 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
     processa o histórico no SQLite e gerencia o pipeline do Gemini com travas comerciais.
     """
     try:
-        # Captura o JSON bruto enviado para evitar erros 422 de validação rígida
         payload_bruto = await request.json()
         print(f"📥 [Webhook] Payload recebido: {payload_bruto}")
         
@@ -88,16 +119,12 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
         if not telefone or not texto_cliente:
             raise HTTPException(status_code=400, detail="Os campos 'telefone' e 'texto' são obrigatórios no JSON.")
         
-        # 1. Registra de forma nativa a entrada do cliente no banco
         salvar_mensagem_historico(telefone, "user", texto_cliente)
         
-        # 2. Resgata contexto (últimas 6 mensagens) e o histórico de longo prazo (últimos 3 agendamentos)
         contexto_conversas = recuperar_contexto_conversa(telefone)
         historico_sistema = buscar_historico_tutor(telefone)
         
-        # 3. Dispara para o Gemini avaliar o diálogo e decidir a ação
         resultado_ia = processar_conversa_gemini(telefone, contexto_conversas, historico_sistema)
-        
         texto_resposta = ""
         
         # Cenário A: A IA identificou que todos os dados foram coletados e chamou a Função de Agendamento
@@ -108,33 +135,36 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
             servico = args.get("servico")
             data_horario = args.get("data_horario")
             
-            # Executa a trava de validação de horário comercial com reinjeção no Gemini
             if not validar_horario_funcionamento(data_horario):
                 erro_contexto = f"[SISTEMA]: Erro ao executar verificar_e_agendar_servico. Motivo: O horário {data_horario} está fora do expediente comercial do pet shop."
                 contexto_conversas.append({"role": "user", "parts": [erro_contexto]})
                 reprocesso = processar_conversa_gemini(telefone, contexto_conversas, historico_sistema)
                 texto_resposta = reprocesso.get("texto", f"Desculpe, mas não funcionamos neste horário ({data_horario}). Que tal escolher outro momento no horário comercial?")
             
-            # Executa a trava de choque de horários duplicados com reinjeção no Gemini
             elif not verificar_disponibilidade_horario(data_horario):
                 erro_contexto = f"[SISTEMA]: Erro ao executar verificar_e_agendar_servico. Motivo: O horário {data_horario} já está ocupado por outro animal de estimação."
                 contexto_conversas.append({"role": "user", "parts": [erro_contexto]})
                 reprocesso = processar_conversa_gemini(telefone, contexto_conversas, historico_sistema)
                 texto_resposta = reprocesso.get("texto", f"Opa, acabei de ver que o horário {data_horario} já está preenchido. Teria outro de sua preferência?")
             
-            # Passou nas duas travas: salva com sucesso no SQLite
+            # Passou nas duas travas: salva no SQLite E espelha no Google Calendar
             else:
                 salvar_agendamento(telefone, nome_tutor, nome_pet, servico, data_horario)
+                
+                # Injeção assíncrona/segura na agenda do Google
+                try:
+                    resumo_evento = f"🐾 {nome_pet} - {servico}"
+                    descricao_evento = f"Tutor: {nome_tutor}\nTelefone: {telefone}\nAgendado via IA Luna"
+                    criar_evento_petshop(resumo_evento, descricao_evento, data_horario)
+                except Exception as e_cal:
+                    print(f"⚠️ [Aviso Google Calendar]: Falha ao espelhar evento na agenda: {e_cal}")
+                
                 texto_resposta = f"Perfeito, tudo certo! 🎉 Agendamento confirmado para o(a) {nome_pet} (Serviço: {servico}) no dia e horário: {data_horario}. Esperamos vocês!"
         
-        # Cenário B: A IA decidiu apenas continuar conversando ou coletando os dados restantes
         else:
             texto_resposta = resultado_ia.get("texto", "Não consegui processar sua mensagem no momento.")
             
-        # 4. Registra nativamente a resposta gerada para o robô lembrar na próxima iteração
         salvar_mensagem_historico(telefone, "model", texto_resposta)
-        
-        # 5. Dispara o envio de volta para o cliente de forma assíncrona (não trava o servidor)
         background_tasks.add_task(enviar_mensagem_whatsapp, telefone, texto_resposta)
         
         return {
@@ -147,13 +177,12 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
         print(f"❌ [Erro Webhook]: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno no pipeline do agente: {str(e)}")
 
-
 # ------------------------------------------------------------------
 # 🤖 SIMULADOR INTEGRADO DA EVOLUTION API (100% GRATUITO E NATIVO)
 # ------------------------------------------------------------------
 @app.post("/mock-api/instance/create", tags=["Simulador Evolution"])
 async def mock_criar_instancia(request: Request):
-    """Simula perfeitamente a rota de criação de instâncias da Evolution API."""
+    """Simula a rota de criação de instâncias da Evolution API."""
     try:
         payload = await request.json()
         print(f"📦 [Simulador] Criando instância fictícia: {payload.get('instanceName')}")
@@ -169,11 +198,3 @@ async def mock_criar_instancia(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/mock-api/instance/connect/{instance_name}", tags=["Simulador Evolution"])
-async def mock_conectar_instancia(instance_name: str):
-    """Simula a rota de captura de dados de conexão, devolvendo o código de pareamento fictício estável."""
-    print(f"🔍 [Simulador] Gerando código de pareamento para a instância: {instance_name}")
-    return {
-        "status": "SUCCESS",
-        "pairingCode": "LUNA-PET-2026",
-        "message": "Código de pareamento gerado localmente pelo simulador com sucesso."
-    }
