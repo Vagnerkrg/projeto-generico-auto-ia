@@ -212,3 +212,16 @@ async def mock_conectar_instancia(instance_name: str):
         "pairingCode": "LUNA-PET-2026",
         "message": "Código de pareamento gerado localmente pelo simulador com sucesso."
     }
+
+@app.post("/mock-api/message/sendText/{instance_name}", tags=["Simulador Evolution"])
+async def mock_enviar_mensagem_texto(instance_name: str, request: Request):
+    """Simula a rota de envio de mensagens de texto da Evolution API para os lembretes ativos."""
+    try:
+        payload = await request.json()
+        print(f"🚀 [Simulador WhatsApp] Mensagem enviada com sucesso via instância {instance_name} para {payload.get('number')}: {payload.get('text')}")
+        return {
+            "status": "SUCCESS",
+            "message": "Mensagem processada e simulada com sucesso no barramento local!"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
