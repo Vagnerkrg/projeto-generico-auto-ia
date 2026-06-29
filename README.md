@@ -1,13 +1,23 @@
-﻿# 🐶 Agente de IA para Pet Shops – Luna 🐾
+﻿@'
+# 🐶 Agente de IA para Pet Shops – Luna 🐾
 
-Agente de atendimento e agendamento inteligente automatizado construído 100% em **Python nativo e FastAPI**, operando de forma totalmente independente de plataformas no-code (como n8n) e estruturado em arquitetura gratuita de alta performance.
+Transforme Seu Pet Shop com Automação Inteligente e Código Nativo! 🚀
 
-## 🚀 Principais Funcionalidades
-* **Atendimento Inteligente**: Integração direta via código com o simulador Evolution API v2 para leitura de payloads flexíveis do WhatsApp.
-* **Motor Cognitivo Estável**: Motor conversacional baseado no Google Gemini API (`gemini-2.5-flash`), com persistência de memória comercial de longo prazo e cross-selling de serviços.
-* **Sincronização em Nuvem**: Injeção e espelhamento assíncrono de agendamentos diretamente na Google Calendar API de forma nativa via OAuth2.
-* **Persistência Relacional**: Banco de dados SQLite local (`database/petshop.db`) com travas comerciais rígidas contra choque de horários duplicados e validação de expediente.
-* **Painel Administrativo**: Script complementar `exibir_dashboard.py` para gerenciamento tabular instantâneo dos atendimentos via terminal.
+Otimize o atendimento ao cliente e agilize processos com este Agente de IA construído 100% em **Python nativo e FastAPI**. 📲🐾 Automatize interações, agendamentos e recomendações de serviços diretamente pelo VS Code — com infraestrutura robusta, totalmente gratuita e independente de plataformas no-code!
+
+## 🔹 Principais Funcionalidades
+* **✅ Atendimento automático no WhatsApp**: Integração direta via código com o simulador Evolution API v2 para leitura de payloads flexíveis. 💬
+* **✅ Agendamento de serviços automatizado**: Motor cognitivo baseado no Google Gemini API (`gemini-2.5-flash`), com persistência de memória de longo prazo. 📅✂️
+* **✅ Sincronização em Nuvem**: Injeção automática de agendamentos diretamente na Google Calendar API de forma assíncrona via OAuth2. 📢🐾
+* **✅ Persistência de Dados Local**: Banco SQLite nativo para controle de histórico de longo prazo e segurança dos dados. 📊📁
+* **✅ Sugestão de produtos e serviços**: Algoritmos comerciais integrados para cross-selling dinâmico de forma contextualizada. 🎁🐶
+
+## 📌 Como Funciona
+1. **O Webhook do FastAPI** recebe payloads flexíveis contendo as mensagens dos clientes via WhatsApp.
+2. **A IA Luna** resgata o histórico do SQLite, analisa os dados e processa o diálogo fornecendo as opções ideais.
+3. **O cliente confirma** as informações e o script dispara a validação de horários duplicados e expediente comercial.
+4. **O agendamento** é consolidado no banco local e espelhado automaticamente no Google Agenda.
+5. **Lembretes nativos** e automáticos garantem o controle completo de faltas do pet shop.
 
 ## 📂 Arquitetura do Projeto
 ```text
@@ -53,3 +63,4 @@ python exibir_dashboard.py
 4. **PANE 04 (PKCE Bypass)**: Captura e persistência dinâmica do parâmetro `flow.code_verifier` contornando a ausência de chaves de verificação.
 5. **PANE 05 (Autenticação 401)**: Mitigação do erro `ACCESS_TOKEN_TYPE_UNSUPPORTED` substituindo tokens dinâmicos por chaves estruturadas no Google AI Studio.
 6. **PANE 06 (GitHub Push Protection)**: Aplicação profunda de `git filter-branch` para expurgar retroativamente arquivos `.env` e segredos sensíveis do histórico remoto, blindando o repositório via SSH.
+'@ | Out-File -FilePath README.md -Encoding utf8
