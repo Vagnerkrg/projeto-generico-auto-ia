@@ -29,5 +29,11 @@ if __name__ == "__main__":
     print(" 🐶 CONCLUINDO SIMULAÇÃO DE ATENDIMENTO - ROBÔ LUNA")
     print("=========================================================")
     
-    # Cliente fornece a resposta com o formato estruturado que a IA exigiu
+    # 1. Primeiro envio: Força o choque de horário que vimos no teste anterior
     simular_mensagem_cliente("Perfeito! A data completa de amanhã é 30/06/2026 às 14:00.")
+    
+    # Aguarda 2 segundos para dar realismo ao fluxo e evitar estouro de requisições por minuto
+    time.sleep(2)
+    
+    # 2. Segundo envio: Cliente aceita um dos horários vagos oferecidos pela Luna
+    simular_mensagem_cliente("Pode ser às 15:00 então, fica ótimo para mim!")
