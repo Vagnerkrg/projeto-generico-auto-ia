@@ -31,7 +31,7 @@ Otimize o atendimento ao cliente e agilize processos com este Agente de IA const
 ├── ligar_tunnel.py         # Inicializador automatizado do túnel pyngrok
 ├── testar_bot.py           # Script de simulação conversacional automatizada
 ├── rodar_lembretes.py      # Motor de busca e envio de notificações ativas
-└── .gitignore              # Blindagem de segurança de chaves locais
+└── testar_global.py        # Motor bruto de testes de estresse concorrentes
 ```
 
 ## ⚙️ Instruções de Reinicialização (Modo de Recuperação Rápida)
@@ -65,4 +65,5 @@ python exibir_dashboard.py
 6. **PANE 06 (GitHub Push Protection)**: Aplicação profunda de `git filter-branch` para expurgar retroativamente arquivos `.env` e segredos sensíveis do histórico remoto, blindando o repositório via SSH.
 7. **PANE 07 (Exclusão Acidental de Configurações)**: Reconstruído arquivo `.env` do absoluto zero contornando colagens lineares incorretas do Windows.
 8. **PANE 08 (Vazamento de Dados Binários)**: Desvinculação do arquivo relacional `database/petshop.db` do rastreamento do repositório remoto.
-9. **PANE 09 (Erro 404 de Barramento)**: Acoplamento da rota `POST /mock-api/message/sendText/{instance_name}` no simulador da API para dar suporte completo às respostas do motor de lembretes ativos.
+9. **PANE 09 (Erro 404 de Barramento)**: Acoplamento da rota `POST /mock-api/message/sendText/{instance_name}` dando suporte às respostas do motor de lembretes ativos.
+10. **PANE 10 (Estouro de RPM - Rate Limit)**: Interceptação preventiva do estouro de cota do plano gratuito do Gemini sob bombardeio de requisições paralelas simultâneas, mantendo a resposta do webhook com sucesso 200 OK.
