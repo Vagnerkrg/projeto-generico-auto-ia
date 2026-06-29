@@ -1,5 +1,4 @@
-﻿@'
-# 🐶 Agente de IA para Pet Shops – Luna 🐾
+﻿# 🐶 Agente de IA para Pet Shops – Luna 🐾
 
 Transforme Seu Pet Shop com Automação Inteligente e Código Nativo! 🚀
 
@@ -31,6 +30,7 @@ Otimize o atendimento ao cliente e agilize processos com este Agente de IA const
 ├── exibir_dashboard.py     # Painel de controle administrativo tabular
 ├── ligar_tunnel.py         # Inicializador automatizado do túnel pyngrok
 ├── testar_bot.py           # Script de simulação conversacional automatizada
+├── rodar_lembretes.py      # Motor de busca e envio de notificações ativas
 └── .gitignore              # Blindagem de segurança de chaves locais
 ```
 
@@ -63,4 +63,6 @@ python exibir_dashboard.py
 4. **PANE 04 (PKCE Bypass)**: Captura e persistência dinâmica do parâmetro `flow.code_verifier` contornando a ausência de chaves de verificação.
 5. **PANE 05 (Autenticação 401)**: Mitigação do erro `ACCESS_TOKEN_TYPE_UNSUPPORTED` substituindo tokens dinâmicos por chaves estruturadas no Google AI Studio.
 6. **PANE 06 (GitHub Push Protection)**: Aplicação profunda de `git filter-branch` para expurgar retroativamente arquivos `.env` e segredos sensíveis do histórico remoto, blindando o repositório via SSH.
-'@ | Out-File -FilePath README.md -Encoding utf8
+7. **PANE 07 (Exclusão Acidental de Configurações)**: Reconstruído arquivo `.env` do absoluto zero contornando colagens lineares incorretas do Windows.
+8. **PANE 08 (Vazamento de Dados Binários)**: Desvinculação do arquivo relacional `database/petshop.db` do rastreamento do repositório remoto.
+9. **PANE 09 (Erro 404 de Barramento)**: Acoplamento da rota `POST /mock-api/message/sendText/{instance_name}` no simulador da API para dar suporte completo às respostas do motor de lembretes ativos.
