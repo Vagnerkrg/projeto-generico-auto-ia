@@ -1,20 +1,44 @@
-version: '3.8'
-
 services:
+  # 1. Banco de Dados PostgreSQL com Checagem de Saúde
+  petshop_db:
+    image: postgres:15-alpine
+    container_name: petshop_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: petshop_senha_secreta
+      POSTGRES_DB: evolution_api
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution_api"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Servidor da Evolution API v2.1.1 Alinhado na Porta 8085
   evolution_api:
     image: evoapicloud/evolution-api:v2.1.1
     container_name: petshop_evolution_api
     restart: always
     ports:
-      - "8080:8080"
+      - "8085:8085"
+    depends_on:
+      petshop_db:
+        condition: service_healthy
     environment:
       - SERVER_TYPE=NODE
-      - SERVER_PORT=8080
-      - DB_TYPE=SQLITE
+      - SERVER_PORT=8085
+      - SERVER_URL=http://127.0.0.1:8085
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:petshop_senha_secreta@petshop_db:5432/evolution_api?schema=public
       - AUTHENTICATION_API_KEY=petshop_secreto_123
       - CONFIG_SESSION_KEY=petshop_secreto_123_sessao
-    volumes:
-      - evolution_data:/evolution/storage
+      - CACHE_REJECT_UNAUTHORIZED=false
+      - CACHE_REDIS_ENABLED=false
 
 volumes:
-  evolution_data:
+  postgres_data:

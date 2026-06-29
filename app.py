@@ -48,7 +48,7 @@ async def get_agendamentos():
         raise HTTPException(status_code=500, detail=str(e))
 
 # ------------------------------------------------------------------
-# 📲 ROTA PRINCIPAL: WEBHOOK INTEGRADO COM TRATAMENTO DINÂMICO (CORRIGIDO)
+# 📲 ROTA PRINCIPAL: WEBHOOK INTEGRADO COM TRATAMENTO DINÂMICO
 # ------------------------------------------------------------------
 @app.post("/webhook", tags=["Webhook"])
 async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
@@ -140,6 +140,45 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
     except Exception as e:
         print(f"❌ [Erro Webhook]: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno no pipeline do agente: {str(e)}")
+
+
+# ------------------------------------------------------------------
+# 🤖 SIMULADOR INTEGRADO DA EVOLUTION API (100% GRATUITO E NATIVO)
+# ------------------------------------------------------------------
+@app.post("/mock-api/instance/create", tags=["Simulador Evolution"])
+async def mock_criar_instancia(request: Request):
+    """Simula perfeitamente a rota de criação de instâncias da Evolution API."""
+    try:
+        payload = await request.json()
+        print(f"📦 [Simulador] Criando instância fictícia: {payload.get('instanceName')}")
+        return {
+            "status": "SUCCESS",
+            "message": "Instância simulada criada com sucesso no cluster local.",
+            "instance": {
+                "instanceName": payload.get("instanceName"),
+                "status": "created"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/mock-api/instance/connect/{instance_name}", tags=["Simulador Evolution"])
+async def mock_conectar_instancia(instance_name: str):
+    """Simula a rota de captura de dados de conexão, devolvendo o código de pareamento."""
+    print(f"🔍 [Simulador] Gerando código de pareamento para a instância: {instance_name}")
+    return {
+        "status": "SUCCESS",
+        "code": "LUNA-PET-2026",
+        "message": "Código gerado com sucesso. Digite-o no seu WhatsApp."
+    }
+
+@app.post("/mock-api/message/sendText/{instance_name}", tags=["Simulador Evolution"])
+async def mock_enviar_mensagem(instance_name: str, request: Request):
+    """Simula o disparo de mensagens de volta para o cliente sem gastar com APIs."""
+    payload = await request.json()
+    print(f"📤 [Simulador - {instance_name}] Mensagem ativa enviada para {payload.get('number')}: {payload.get('text')}")
+    return {"status": "SUCCESS", "message": "Mensagem enviada com sucesso de forma simulada."}
+
 
 if __name__ == "__main__":
     import uvicorn

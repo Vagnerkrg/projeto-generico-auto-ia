@@ -1,51 +1,56 @@
 import os
-import sqlite3
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
+import datetime
 from database import buscar_agendamentos_por_data
 from services.whatsapp_bot import enviar_mensagem_whatsapp
 
-load_dotenv()
-NOME_PETSHOP = os.getenv("NOME_PETSHOP", "Amigo Fiel")
-
-def disparar_lembretes_ativos():
-    print("==========================================================")
-    print("📢 MOTOR DE LEMBRETES ATIVOS - PET SHOP NATIVO")
-    print("==========================================================")
+def disparar_lembretes_noturnos():
+    print("=========================================================")
+    print(" 📢 EXECUTANDO MOTOR DE LEMBRETES AUTOMÁTICOS DO PET SHOP")
+    print("=========================================================")
     
-    # Calcula dinamicamente a data de amanhã (formato AAAA-MM-DD)
-    amanha = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    print(f"📅 Buscando agendamentos pendentes para amanhã: {amanha}...")
+    # Calcula exatamente a data de amanhã
+    amanha = (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    print(f"📅 Varrendo o banco local em busca de agendamentos para amanhã: {amanha}...")
     
-    clientes_alvo = buscar_agendamentos_por_data(amanha)
-    total = len(clientes_alvo)
-    print(f"📊 Encontrado(s) {total} agendamento(s) para notificar.\n")
-    
-    if total == 0:
-        print("✨ Nenhum lembrete precisa ser enviado hoje. Sistema em espera.")
-        return
+    try:
+        # Busca no SQLite de forma nativa
+        agendamentos_amanha = buscar_agendamentos_por_data(amanha)
+        total = len(agendamentos_amanha)
+        print(f"📈 Total de lembretes encontrados para amanhã: {total}\n")
         
-    for cliente in clientes_alvo:
-        telefone = cliente["telefone"]
-        tutor = cliente["nome_tutor"]
-        pet = cliente["nome_pet"]
-        servico = cliente["servico"]
-        data_bruta = cliente["data_horario"]
-        
-        # Extração do horário de forma segura contra falhas de índice
-        partes = data_bruta.split(" ")
-        horario_limpo = partes[1] if len(partes) > 1 else data_bruta
-        
-        mensagem_lembrete = (
-            f"Olá, {tutor}! Passando para lembrar que amanhã, o(a) *{pet}* tem um horário marcado "
-            f"para *{servico}* aqui no *{NOME_PETSHOP}* às *{horario_limpo}*. 🐾\n\n"
-            f"Confirmado? Se precisar remarcar, basta me avisar por aqui! 😊"
-        )
-        
-        print(f"🚀 Enviando lembrete para {tutor} (Pet: {pet}) no número {telefone}...")
-        enviar_mensagem_whatsapp(telefone, mensagem_lembrete)
-        
-    print("\n✅ Todos os lembretes diários foram processados com sucesso!")
+        if total == 0:
+            print("💤 Nenhum compromisso agendado para amanhã. Motor encerrado.")
+            return
+            
+        for item in agendamentos_amanha:
+            telefone = item.get("telefone")
+            nome_tutor = item.get("nome_tutor")
+            nome_pet = item.get("nome_pet")
+            servico = item.get("servico")
+            
+            # Tratamento seguro para extrair o horário do texto salvo
+            data_horario_bruta = item.get("data_horario", "")
+            if " " in data_horario_bruta:
+                partes = data_horario_bruta.split(" ")
+                horario = partes[1] if len(partes) > 1 else partes[0]
+            else:
+                horario = data_horario_bruta if data_horario_bruta else "horário agendado"
+            
+            # Monta a mensagem ativa inteligente personalizada com os dados do .env
+            mensagem = (
+                f"Olá, {nome_tutor}! 👋 Aqui é a {os.getenv('NOME_IA', 'Luna')} do Pet Shop {os.getenv('NOME_PETSHOP', 'Amigo Fiel')}. 🐶\n\n"
+                f"Passando para lembrar que amanhã ({amanha}) o(a) *{nome_pet}* tem um horário agendado conosco para *{servico}* às *{horario}*! 🗓️✨\n\n"
+                f"Contamos com a presença de vocês! Se precisar reagendar, avisar com antecedência. 🐾"
+            )
+            
+            print(f"📤 Disparando Lembrete Ativo para {nome_tutor} (Pet: {nome_pet})...")
+            
+            # CORREÇÃO CIRÚRGICA: Passando as variáveis de forma direta por posição, sem o 'message='
+            enviar_mensagem_whatsapp(telefone, mensagem)
+            print("✅ Mensagem processada com sucesso no barramento!\n")
+            
+    except Exception as e:
+        print(f"❌ Erro na execução do motor de lembretes: {str(e)}")
 
 if __name__ == "__main__":
-    disparar_lembretes_ativos()
+    disparar_lembretes_noturnos()
