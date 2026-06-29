@@ -5,6 +5,9 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 
+# Habilita o tráfego HTTP local para contornar a trava de segurança do OAuth2 em testes
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
 # Importações nativas de banco de dados
 from database import (
     salvar_agendamento,
@@ -29,7 +32,6 @@ app = FastAPI(
     version="1.2.0"
 )
 
-# Mantido no código para documentação automática no Swagger UI (/docs)
 class MensagemWhatsApp(BaseModel):
     telefone: str
     texto: str
@@ -40,18 +42,34 @@ class MensagemWhatsApp(BaseModel):
 # ------------------------------------------------------------------
 @app.get("/login-google", tags=["Google Calendar"])
 def login_google():
-    """Rota para iniciar a autenticação da Luna com a agenda."""
+    """Rota para iniciar a autenticação salvando os parâmetros necessários."""
     flow = obter_fluxo_autenticacao()
+    # Gera a URL de autorização obtendo o code_verifier gerado na hora
     authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true')
+    
+    # Salvamos o code_verifier gerado na memória do próprio objeto temporário para uso posterior
+    os.environ[f"GOOGLE_PKCE_{state}"] = flow.code_verifier
     return RedirectResponse(authorization_url)
 
 @app.get("/oauth2callback", tags=["Google Calendar"])
 async def oauth2callback(request: Request):
-    """Rota de retorno do Google que gera e grava o token.json."""
+    """Rota de retorno do Google que recupera o PKCE correto e gera o token.json."""
     flow = obter_fluxo_autenticacao()
+    
+    # Recupera o parâmetro 'state' enviado pelo Google na URL
+    state = request.query_params.get("state")
+    
+    # Busca o code_verifier original associado àquele estado
+    saved_verifier = os.environ.get(f"GOOGLE_PKCE_{state}")
+    
+    if saved_verifier:
+        flow.code_verifier = saved_verifier
+    else:
+        # Fallback de segurança caso a memória expire
+        flow.code_verifier = None
+        
     str_url = str(request.url)
     
-    # Correção necessária caso o ngrok/redirecionador force protocolo HTTP interno
     if "http://" in str_url and not "localhost" in str_url:
         str_url = str_url.replace("http://", "https://")
         
@@ -60,6 +78,10 @@ async def oauth2callback(request: Request):
     
     with open('services/token.json', 'w') as token:
         token.write(creds.to_json())
+        
+    # Limpa a variável temporária do ambiente
+    if f"GOOGLE_PKCE_{state}" in os.environ:
+        del os.environ[f"GOOGLE_PKCE_{state}"]
         
     return {"status": "Sucesso", "mensagem": "Luna está conectada com sucesso ao seu Google Calendar!"}
 
@@ -78,21 +100,16 @@ async def get_agendamentos():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 # ------------------------------------------------------------------
 # 📲 ROTA PRINCIPAL: WEBHOOK INTEGRADO COM TRATAMENTO DINÂMICO
 # ------------------------------------------------------------------
 @app.post("/webhook", tags=["Webhook"])
 async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
-    """
-    Endpoint unificado corrigido que aceita payloads flexíveis (dados reais ou mocks de teste),
-    processa o histórico no SQLite e gerencia o pipeline do Gemini com travas comerciais.
-    """
+    """Endpoint unificado que processa o Gemini e gerencia o pipeline com travas comerciais."""
     try:
         payload_bruto = await request.json()
         print(f"📥 [Webhook] Payload recebido: {payload_bruto}")
         
-        # --- CASO A: Compatibilidade com dicionários estáticos de teste antigos ---
         if "dados_testes" in payload_bruto:
             dados = payload_bruto["dados_testes"]
             telefone = payload_bruto.get("telefone", "5511999998888")
@@ -112,7 +129,6 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
             salvar_agendamento(telefone, nome_tutor, nome_pet, servico, data_horario)
             return {"status": "sucesso", "resposta_enviada": f"Agendamento de teste para {nome_pet} salvo com sucesso!"}
             
-        # --- CASO B: Fluxo Conversacional Real (Humano ou novo script testar_bot.py) ---
         telefone = payload_bruto.get("telefone")
         texto_cliente = payload_bruto.get("texto")
         
@@ -120,14 +136,12 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
             raise HTTPException(status_code=400, detail="Os campos 'telefone' e 'texto' são obrigatórios no JSON.")
         
         salvar_mensagem_historico(telefone, "user", texto_cliente)
-        
         contexto_conversas = recuperar_contexto_conversa(telefone)
         historico_sistema = buscar_historico_tutor(telefone)
         
         resultado_ia = processar_conversa_gemini(telefone, contexto_conversas, historico_sistema)
         texto_resposta = ""
         
-        # Cenário A: A IA identificou que todos os dados foram coletados e chamou a Função de Agendamento
         if resultado_ia.get("acao") == "chamar_funcao" and resultado_ia.get("nome_funcao") == "verificar_e_agendar_servico":
             args = resultado_ia.get("argumentos", {})
             nome_tutor = args.get("nome_tutor")
@@ -147,11 +161,8 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
                 reprocesso = processar_conversa_gemini(telefone, contexto_conversas, historico_sistema)
                 texto_resposta = reprocesso.get("texto", f"Opa, acabei de ver que o horário {data_horario} já está preenchido. Teria outro de sua preferência?")
             
-            # Passou nas duas travas: salva no SQLite E espelha no Google Calendar
             else:
                 salvar_agendamento(telefone, nome_tutor, nome_pet, servico, data_horario)
-                
-                # Injeção assíncrona/segura na agenda do Google
                 try:
                     resumo_evento = f"🐾 {nome_pet} - {servico}"
                     descricao_evento = f"Tutor: {nome_tutor}\nTelefone: {telefone}\nAgendado via IA Luna"
@@ -160,7 +171,6 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
                     print(f"⚠️ [Aviso Google Calendar]: Falha ao espelhar evento na agenda: {e_cal}")
                 
                 texto_resposta = f"Perfeito, tudo certo! 🎉 Agendamento confirmado para o(a) {nome_pet} (Serviço: {servico}) no dia e horário: {data_horario}. Esperamos vocês!"
-        
         else:
             texto_resposta = resultado_ia.get("texto", "Não consegui processar sua mensagem no momento.")
             
@@ -172,7 +182,6 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
             "fluxo_executado": resultado_ia.get("acao"),
             "resposta_enviada": texto_resposta
         }
-        
     except Exception as e:
         print(f"❌ [Erro Webhook]: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno no pipeline do agente: {str(e)}")
@@ -189,10 +198,7 @@ async def mock_criar_instancia(request: Request):
         return {
             "status": "SUCCESS",
             "message": "Instância simulada criada com sucesso no cluster local.",
-            "instance": {
-                "instanceName": payload.get("instanceName"),
-                "status": "created"
-            }
+            "instance": {"instanceName": payload.get("instanceName"), "status": "created"}
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

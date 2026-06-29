@@ -5,9 +5,10 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
-SCOPES = ['https://googleapis.auth']
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 CREDENTIALS_FILE = 'services/credentials.json'
 TOKEN_FILE = 'services/token.json'
+
 
 def obter_fluxo_autenticacao():
     """Configura o fluxo OAuth2 apontando para o redirecionamento correto da porta 5000."""
@@ -16,6 +17,8 @@ def obter_fluxo_autenticacao():
         scopes=SCOPES,
         redirect_uri='http://localhost:5000/oauth2callback'
     )
+    # Remove a exigência do PKCE que causa o erro InvalidGrantError localmente
+    flow.code_verifier = None
     return flow
 
 def obter_servico_calendario():
