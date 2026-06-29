@@ -22,7 +22,7 @@ from services.whatsapp_bot import enviar_mensagem_whatsapp
 app = FastAPI(
     title="Agente de IA para Pet Shop",
     description="API nativa integrada para atendimento e agendamento inteligente",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 # Mantido no código para documentação automática no Swagger UI (/docs)
@@ -108,13 +108,19 @@ async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
             servico = args.get("servico")
             data_horario = args.get("data_horario")
             
-            # Executa a trava de validação de horário comercial
+            # Executa a trava de validação de horário comercial com reinjeção no Gemini
             if not validar_horario_funcionamento(data_horario):
-                texto_resposta = f"Desculpe, mas não funcionamos neste horário informado ({data_horario}). Que tal escolher outro momento dentro do expediente comercial?"
+                erro_contexto = f"[SISTEMA]: Erro ao executar verificar_e_agendar_servico. Motivo: O horário {data_horario} está fora do expediente comercial do pet shop."
+                contexto_conversas.append({"role": "user", "parts": [erro_contexto]})
+                reprocesso = processar_conversa_gemini(telefone, contexto_conversas, historico_sistema)
+                texto_resposta = reprocesso.get("texto", f"Desculpe, mas não funcionamos neste horário ({data_horario}). Que tal escolher outro momento no horário comercial?")
             
-            # Executa a trava de choque/conflito de horários duplicados
+            # Executa a trava de choque de horários duplicados com reinjeção no Gemini
             elif not verificar_disponibilidade_horario(data_horario):
-                texto_resposta = f"Opa! Verifiquei aqui no meu sistema que o horário de {data_horario} já está preenchido para outro pet. Teria outro horário de sua preferência?"
+                erro_contexto = f"[SISTEMA]: Erro ao executar verificar_e_agendar_servico. Motivo: O horário {data_horario} já está ocupado por outro animal de estimação."
+                contexto_conversas.append({"role": "user", "parts": [erro_contexto]})
+                reprocesso = processar_conversa_gemini(telefone, contexto_conversas, historico_sistema)
+                texto_resposta = reprocesso.get("texto", f"Opa, acabei de ver que o horário {data_horario} já está preenchido. Teria outro de sua preferência?")
             
             # Passou nas duas travas: salva com sucesso no SQLite
             else:
@@ -164,22 +170,10 @@ async def mock_criar_instancia(request: Request):
 
 @app.get("/mock-api/instance/connect/{instance_name}", tags=["Simulador Evolution"])
 async def mock_conectar_instancia(instance_name: str):
-    """Simula a rota de captura de dados de conexão, devolvendo o código de pareamento."""
+    """Simula a rota de captura de dados de conexão, devolvendo o código de pareamento fictício estável."""
     print(f"🔍 [Simulador] Gerando código de pareamento para a instância: {instance_name}")
     return {
         "status": "SUCCESS",
-        "code": "LUNA-PET-2026",
-        "message": "Código gerado com sucesso. Digite-o no seu WhatsApp."
+        "pairingCode": "LUNA-PET-2026",
+        "message": "Código de pareamento gerado localmente pelo simulador com sucesso."
     }
-
-@app.post("/mock-api/message/sendText/{instance_name}", tags=["Simulador Evolution"])
-async def mock_enviar_mensagem(instance_name: str, request: Request):
-    """Simula o disparo de mensagens de volta para o cliente sem gastar com APIs."""
-    payload = await request.json()
-    print(f"📤 [Simulador - {instance_name}] Mensagem ativa enviada para {payload.get('number')}: {payload.get('text')}")
-    return {"status": "SUCCESS", "message": "Mensagem enviada com sucesso de forma simulada."}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=True)
