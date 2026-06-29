@@ -67,3 +67,15 @@ python exibir_dashboard.py
 8. **PANE 08 (Vazamento de Dados Binários)**: Desvinculação do arquivo relacional `database/petshop.db` do rastreamento do repositório remoto.
 9. **PANE 09 (Erro 404 de Barramento)**: Acoplamento da rota `POST /mock-api/message/sendText/{instance_name}` dando suporte às respostas do motor de lembretes ativos.
 10. **PANE 10 (Estouro de RPM - Rate Limit)**: Interceptação preventiva do estouro de cota do plano gratuito do Gemini sob bombardeio de requisições paralelas simultâneas, mantendo a resposta do webhook com sucesso 200 OK.
+
+---
+
+## 👨‍💻 Autor e Desenvolvedor Principal
+Este ecossistema foi projetado, desenvolvido e homologado do absoluto zero por:
+
+* **Vagner** — *Engenheiro de Software & Desenvolvedor de Soluções de IA*
+* 💻 **GitHub**: [Vagnerkrg](https://github.com)
+* 🚀 **LinkedIn**: [Seu Perfil Aqui] *(Dica: substitua essa frase pelo link do seu perfil se quiser)*
+
+---
+*Propriedade intelectual protegida de forma local. Desenvolvido para fins de otimização de negócios e portfólio sênior.*
