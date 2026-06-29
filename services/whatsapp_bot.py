@@ -4,30 +4,31 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Recupera as configurações da Evolution API salvas no arquivo .env
-EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "http://localhost:8080")
-EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "petshop_secreto_123")
-EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "AmigoFiel")
+# Recupera a URL calibrada no .env (http://localhost:5000/mock-api)
+EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "http://localhost:5000/mock-api")
+INSTANCE_NAME = os.getenv("INSTANCE_NAME", "AmigoFiel")
+API_KEY = os.getenv("EVOLUTION_API_KEY", "42a83c93-60ae-432d-862d-a2f07297b83d")
 
-def enviar_mensagem_whatsapp(telefone: str, texto: str) -> bool:
+def enviar_mensagem_whatsapp(telefone: str, texto: str):
     """
-    Envia uma mensagem de texto real para o cliente utilizando a Evolution API v2.
-    Retorna True em caso de sucesso e False em caso de falha.
+    Despacha a mensagem de resposta utilizando a URL configurada no ambiente.
+    Direciona automaticamente para o simulador interno na porta 5000.
     """
-    # Higieniza o número mantendo apenas os dígitos numéricos
-    numero_limpo = ''.join(filter(str.isdigit, telefone))
+    # Remove caracteres não numéricos do telefone por segurança
+    numero_limpo = "".join(filter(str.isdigit, telefone))
     
-    url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE}"
+    # Monta a rota apontando dinamicamente para o barramento correto
+    url_final = f"{EVOLUTION_API_URL}/message/sendText/{INSTANCE_NAME}"
     
     headers = {
         "Content-Type": "application/json",
-        "apikey": EVOLUTION_API_KEY
+        "apikey": API_KEY
     }
     
     payload = {
         "number": numero_limpo,
         "options": {
-            "delay": 1200, # Simula digitação humana de 1.2 segundos
+            "delay": 1200,
             "presence": "composing"
         },
         "textMessage": {
@@ -36,15 +37,15 @@ def enviar_mensagem_whatsapp(telefone: str, texto: str) -> bool:
     }
     
     try:
-        print(f"🚀 [WhatsApp Out] Despachando mensagem para o número {numero_limpo} via Evolution v2...")
-        resposta = requests.post(url, json=payload, headers=headers, timeout=10)
+        print(f"🚀 [WhatsApp Out] Enviando via: {url_final}")
+        resposta = requests.post(url_final, json=payload, headers=headers, timeout=10)
         
-        # CORREÇÃO DEFINITIVA: Validação numérica direta sem usar a palavra "in"
-        if 200 <= resposta.status_code <= 299:
-            print(f"✅ [WhatsApp Out] Mensagem enviada com sucesso! Status: {resposta.status_code}")
+        # Correção matemática definitiva: evita colchetes/parênteses e aceita qualquer HTTP 2xx de sucesso
+        if 200 <= resposta.status_code < 300:
+            print(f"✅ [WhatsApp Out] Mensagem entregue com sucesso para {numero_limpo}.")
             return True
         else:
-            print(f"❌ [WhatsApp Out] Falha no envio. Retorno da API: {resposta.text}")
+            print(f"⚠️ [WhatsApp Out] Resposta inesperada do barramento: {resposta.status_code} - {resposta.text}")
             return False
             
     except Exception as e:
